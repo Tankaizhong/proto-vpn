@@ -308,6 +308,59 @@ class ByteCounterTests(unittest.TestCase):
         self.assertEqual(sel.bytes_since_switch, 0)
 
 
+class RoundRobinTests(unittest.TestCase):
+    """round_robin strategy cycles endpoints in list order after min_hold."""
+
+    def _build_rr(self) -> tuple[Selector, Config]:
+        a = _ep("a")
+        b = _ep("b")
+        c = _ep("c")
+        cfg = Config(min_hold=60.0)
+        sel = Selector(endpoints=[a, b, c], strategy="round_robin", current=a, last_switch=0.0)
+        return sel, cfg
+
+    def test_advances_to_next_in_list(self) -> None:
+        sel, cfg = self._build_rr()
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.reason, "round_robin_rotation")
+        self.assertEqual(dec.target.id, "b")
+
+    def test_wraps_around_from_last_to_first(self) -> None:
+        sel, cfg = self._build_rr()
+        sel.current = sel.endpoints[2]  # currently on "c"
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.target.id, "a")
+
+    def test_skips_dead_and_cooldown_endpoints(self) -> None:
+        sel, cfg = self._build_rr()
+        sel.endpoints[1].state = EndpointState.DEAD      # "b" dead
+        sel.endpoints[2].state = EndpointState.COOLDOWN  # "c" in cooldown
+        # Only "a" available but that's current → no switch possible
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNone(dec)
+
+    def test_skips_to_next_healthy_past_unavailable(self) -> None:
+        sel, cfg = self._build_rr()
+        sel.endpoints[1].state = EndpointState.DEAD  # "b" dead; should land on "c"
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.target.id, "c")
+
+    def test_blocked_by_min_hold(self) -> None:
+        sel, cfg = self._build_rr()
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold - 1)
+        self.assertIsNone(dec)
+
+    def test_does_not_do_score_based_switch(self) -> None:
+        """round_robin must not switch based on score advantage."""
+        sel, cfg = self._build_rr()
+        sel.endpoints[1].score = 10.0  # huge score advantage
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold - 1)  # still within hold
+        self.assertIsNone(dec)
+
+
 class HandshakeFailHookTests(unittest.TestCase):
     def test_repeated_fails_push_to_cooldown(self) -> None:
         cfg = Config(hs_fail_threshold=3, cooldown_base=30)

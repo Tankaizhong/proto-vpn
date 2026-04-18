@@ -233,6 +233,19 @@ def maybe_switch(
                 return _do_switch(sel, alt, "bytes_rotation", now)
             return None
 
+    # 3b. Round-robin: advance to the next available endpoint in list order.
+    if sel.strategy == "round_robin":
+        eps = sel.endpoints
+        try:
+            idx = next(i for i, e in enumerate(eps) if e.id == sel.current.id)
+        except StopIteration:
+            idx = -1
+        for offset in range(1, len(eps)):
+            candidate = eps[(idx + offset) % len(eps)]
+            if candidate.state not in (EndpointState.COOLDOWN, EndpointState.DEAD):
+                return _do_switch(sel, candidate, "round_robin_rotation", now)
+        return None
+
     # 4. Score advantage beyond switch_margin
     if sel.strategy in ("rtt_score", "hybrid"):
         best = pick_best(sel.endpoints, exclude_states=(EndpointState.COOLDOWN, EndpointState.DEAD))
