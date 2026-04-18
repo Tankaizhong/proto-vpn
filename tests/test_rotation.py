@@ -361,6 +361,45 @@ class RoundRobinTests(unittest.TestCase):
         self.assertIsNone(dec)
 
 
+class TimeWindowStrategyTests(unittest.TestCase):
+    """time_window strategy: rotates on elapsed time but NOT on bytes or score."""
+
+    def _build_tw(self) -> tuple[Selector, Config]:
+        a = _ep("a", score=0.9)
+        b = _ep("b", score=0.8)
+        c = _ep("c", score=0.7)
+        cfg = Config(min_hold=60.0)
+        sel = Selector(endpoints=[a, b, c], strategy="time_window", current=a, last_switch=0.0)
+        return sel, cfg
+
+    def test_fires_after_time_window(self) -> None:
+        sel, cfg = self._build_tw()
+        rng = random.Random(3)
+        dec = maybe_switch(sel, cfg, now=cfg.rotation_window + 1, rng=rng)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.reason, "time_window_rotation")
+        self.assertNotEqual(dec.target.id, "a")
+
+    def test_does_not_fire_before_time_window(self) -> None:
+        sel, cfg = self._build_tw()
+        dec = maybe_switch(sel, cfg, now=cfg.rotation_window - 1)
+        self.assertIsNone(dec)
+
+    def test_does_not_trigger_bytes_rotation(self) -> None:
+        """time_window ignores bytes threshold — only hybrid reacts to bytes."""
+        sel, cfg = self._build_tw()
+        sel.bytes_since_switch = cfg.rotation_bytes + 1
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNone(dec)
+
+    def test_does_not_switch_on_score_advantage(self) -> None:
+        """time_window ignores score-based switching."""
+        sel, cfg = self._build_tw()
+        sel.endpoints[1].score = 10.0  # huge score advantage
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNone(dec)
+
+
 class HandshakeFailHookTests(unittest.TestCase):
     def test_repeated_fails_push_to_cooldown(self) -> None:
         cfg = Config(hs_fail_threshold=3, cooldown_base=30)

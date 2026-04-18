@@ -236,6 +236,40 @@ class MalformedTokenTests(unittest.TestCase):
             verify_subscription(f"{h}.{p}.{s}", pinset)
 
 
+class PinsetTests(unittest.TestCase):
+    def test_remove_prevents_verification(self) -> None:
+        key = SigningKey.generate("kid-1")
+        pinset = Pinset()
+        pinset.add(key.public())
+        token = sign_subscription(key, _sample_payload())
+        pinset.remove("kid-1")
+        with self.assertRaises(UnknownKidError):
+            verify_subscription(token, pinset)
+
+    def test_kids_lists_all_added_kids(self) -> None:
+        pinset = Pinset()
+        pinset.add(SigningKey.generate("kid-a").public())
+        pinset.add(SigningKey.generate("kid-b").public())
+        self.assertCountEqual(pinset.kids(), ["kid-a", "kid-b"])
+
+    def test_remove_nonexistent_kid_is_noop(self) -> None:
+        pinset = Pinset()
+        pinset.remove("ghost")  # must not raise
+        self.assertEqual(pinset.kids(), [])
+
+    def test_add_overwrites_existing_kid(self) -> None:
+        pinset = Pinset()
+        k1 = SigningKey.generate("kid-1")
+        k2 = SigningKey.generate("kid-1")  # same kid, different key
+        pinset.add(k1.public())
+        pinset.add(k2.public())
+        self.assertEqual(len(pinset.kids()), 1)
+        # Only k2 remains — token signed by k1 must now fail
+        token = sign_subscription(k1, _sample_payload())
+        with self.assertRaises(BadSignatureError):
+            verify_subscription(token, pinset)
+
+
 class Base64UrlTests(unittest.TestCase):
     def test_roundtrip_arbitrary_bytes(self) -> None:
         for raw in [b"", b"a", b"ab", b"abc", b"\x00\xff\x7f", bytes(range(256))]:
