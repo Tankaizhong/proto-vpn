@@ -205,8 +205,23 @@ class StateMachineTests(unittest.TestCase):
         update_state(ep, cfg, now=0.0)
         self.assertEqual(ep.state, EndpointState.DEGRADED)
 
+    def test_cooldown_re_entered_when_still_failing(self) -> None:
+        """Cooldown expires but hs_fail is still >= threshold → re-enters cooldown."""
+        cfg = Config(hs_fail_threshold=3, cooldown_base=30, cooldown_max=600)
+        ep = _ep("e", state=EndpointState.COOLDOWN, cooldown_until=50.0)
+        ep.hs_fail = 4  # still above threshold after cooldown
+        update_state(ep, cfg, now=100.0)
+        # Should be back in COOLDOWN, not stay in the transient DEGRADED
+        self.assertEqual(ep.state, EndpointState.COOLDOWN)
+        # backoff = 30 * 2^(4-3) = 60 → cooldown_until = 100 + 60 = 160
+        self.assertEqual(ep.cooldown_until, 160.0)
+
 
 class SelectionTests(unittest.TestCase):
+    def test_pick_best_empty_list_returns_none(self) -> None:
+        self.assertIsNone(pick_best([]))
+        self.assertIsNone(pick_best([], exclude_states=(EndpointState.DEAD,)))
+
     def test_pick_best_ignores_excluded_states(self) -> None:
         a = _ep("a", score=0.9)
         b = _ep("b", score=0.8, state=EndpointState.COOLDOWN)
@@ -478,6 +493,15 @@ class HandshakeFailHookTests(unittest.TestCase):
         for i in range(3):
             on_handshake_fail(sel, ep, cfg, now=float(i))
         self.assertEqual(ep.state, EndpointState.COOLDOWN)
+
+    def test_single_fail_below_threshold_stays_healthy(self) -> None:
+        """A single handshake failure below the threshold must not trigger cooldown."""
+        cfg = Config(hs_fail_threshold=3)
+        ep = _ep("e", score=1.0)  # healthy score
+        sel = Selector(endpoints=[ep], current=ep)
+        on_handshake_fail(sel, ep, cfg, now=0.0)
+        self.assertEqual(ep.hs_fail, 1)
+        self.assertEqual(ep.state, EndpointState.HEALTHY)
 
 
 if __name__ == "__main__":
