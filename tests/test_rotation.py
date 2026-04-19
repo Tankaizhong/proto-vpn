@@ -101,6 +101,37 @@ class ScoringTests(unittest.TestCase):
         self.assertLess(s, 0.1)
 
 
+class StabilityWindowResizeTests(unittest.TestCase):
+    """update_metrics rebinds the probe deque when cfg.stability_window changes."""
+
+    def test_deque_rebinds_when_window_shrinks(self) -> None:
+        cfg = Config(stability_window=10)
+        ep = _ep("e")
+        for i in range(10):
+            update_metrics(ep, rtt_ms=50.0, ok=True, cfg=cfg, now=float(i))
+        self.assertEqual(ep._probes.maxlen, 10)
+        self.assertEqual(ep.stability(), 1.0)
+
+        cfg.stability_window = 4
+        update_metrics(ep, rtt_ms=50.0, ok=True, cfg=cfg, now=10.0)
+        self.assertEqual(ep._probes.maxlen, 4)
+        self.assertEqual(ep.stability(), 1.0)
+
+    def test_deque_rebinds_when_window_grows(self) -> None:
+        cfg = Config(stability_window=3)
+        ep = _ep("e")
+        for i in range(3):
+            update_metrics(ep, rtt_ms=50.0, ok=False, cfg=cfg, now=float(i))
+        self.assertEqual(ep._probes.maxlen, 3)
+        self.assertEqual(ep.stability(), 0.0)
+
+        cfg.stability_window = 10
+        update_metrics(ep, rtt_ms=50.0, ok=True, cfg=cfg, now=3.0)
+        self.assertEqual(ep._probes.maxlen, 10)
+        # 3 prior failures carried over + 1 success → 1 success out of 4 entries
+        self.assertAlmostEqual(ep.stability(), 0.25)
+
+
 class EwmaTests(unittest.TestCase):
     def test_ewma_rtt_converges(self) -> None:
         cfg = Config(alpha=0.3)
