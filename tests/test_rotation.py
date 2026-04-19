@@ -302,6 +302,22 @@ class SwitchingTests(unittest.TestCase):
         self.assertIsNotNone(dec)
         self.assertEqual(dec.reason, "bytes_rotation")
 
+    def test_bytes_rotation_no_alternatives_returns_none(self) -> None:
+        """Bytes threshold exceeded but all other endpoints unavailable → no switch."""
+        a = _ep("a", score=0.9)
+        b = _ep("b", score=0.8, state=EndpointState.DEAD)
+        cfg = Config(min_hold=60.0)
+        sel = Selector(
+            endpoints=[a, b],
+            strategy="hybrid",
+            current=a,
+            last_switch=0.0,
+            bytes_since_switch=cfg.rotation_bytes + 1,
+        )
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNone(dec)
+        self.assertIs(sel.current, a)  # current unchanged
+
     def test_current_unavailable_forces_immediate_switch(self) -> None:
         sel, cfg = self._build()
         sel.current.state = EndpointState.COOLDOWN
@@ -391,6 +407,18 @@ class RoundRobinTests(unittest.TestCase):
         dec = maybe_switch(sel, cfg, now=cfg.min_hold - 1)  # still within hold
         self.assertIsNone(dec)
 
+    def test_current_not_in_endpoints_falls_back_to_first(self) -> None:
+        """If current endpoint is not in the list (e.g. after config refresh),
+        round_robin uses idx=-1 via StopIteration and picks eps[0] first."""
+        a, b, c = _ep("a"), _ep("b"), _ep("c")
+        cfg = Config(min_hold=60.0)
+        ghost = _ep("ghost")  # stale reference, not in endpoints
+        sel = Selector(endpoints=[a, b, c], strategy="round_robin", current=ghost, last_switch=0.0)
+        dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.reason, "round_robin_rotation")
+        self.assertEqual(dec.target.id, "a")
+
 
 class TimeWindowStrategyTests(unittest.TestCase):
     """time_window strategy: rotates on elapsed time but NOT on bytes or score."""
@@ -429,6 +457,17 @@ class TimeWindowStrategyTests(unittest.TestCase):
         sel.endpoints[1].score = 10.0  # huge score advantage
         dec = maybe_switch(sel, cfg, now=cfg.min_hold + 1)
         self.assertIsNone(dec)
+
+    def test_returns_none_when_no_alternatives_available(self) -> None:
+        """Time-window fires but pick_different returns None → no switch."""
+        a = _ep("a", score=0.9)
+        b = _ep("b", score=0.8, state=EndpointState.DEAD)
+        c = _ep("c", score=0.7, state=EndpointState.COOLDOWN)
+        cfg = Config(min_hold=60.0)
+        sel = Selector(endpoints=[a, b, c], strategy="time_window", current=a, last_switch=0.0)
+        dec = maybe_switch(sel, cfg, now=cfg.rotation_window + 1)
+        self.assertIsNone(dec)
+        self.assertIs(sel.current, a)  # current unchanged
 
 
 class HandshakeFailHookTests(unittest.TestCase):
