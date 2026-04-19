@@ -235,6 +235,27 @@ class MalformedTokenTests(unittest.TestCase):
         with self.assertRaises(BadFormatError):
             verify_subscription(f"{h}.{p}.{s}", pinset)
 
+    def test_missing_kid_raises_bad_format(self) -> None:
+        """Header without 'kid' must raise BadFormatError before sig check."""
+        h = b64url_encode(json.dumps({"alg": "EdDSA"}).encode())
+        p = b64url_encode(b"{}")
+        # Signature is never reached — kid check fires first.
+        with self.assertRaises(BadFormatError):
+            verify_subscription(f"{h}.{p}.ZmFrZQ", Pinset())
+
+    def test_non_integer_nbf_raises_bad_format(self) -> None:
+        """Payload with a string nbf must raise BadFormatError after sig passes."""
+        key = SigningKey.generate("kid-x")
+        pinset = Pinset()
+        pinset.add(key.public())
+        header = {"alg": "EdDSA", "kid": "kid-x"}
+        payload = {"v": 1, "nbf": "not-an-int", "exp": 9_999_999_999}
+        h = b64url_encode(json.dumps(header, sort_keys=True, separators=(",", ":")).encode())
+        p = b64url_encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
+        sig = b64url_encode(key.private_key.sign(f"{h}.{p}".encode("ascii")))
+        with self.assertRaises(BadFormatError):
+            verify_subscription(f"{h}.{p}.{sig}", pinset)
+
 
 class PinsetTests(unittest.TestCase):
     def test_remove_prevents_verification(self) -> None:
