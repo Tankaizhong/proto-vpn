@@ -91,7 +91,9 @@ def validate_payload(payload: dict[str, Any]) -> None:
         proto = _require(ep, "proto", str)
         if proto not in ALLOWED_PROTOS:
             raise SchemaError(f"endpoints[{i}].proto {proto!r} not in {sorted(ALLOWED_PROTOS)}")
-        _require(ep, "host", str)
+        host = _require(ep, "host", str)
+        if not host:
+            raise SchemaError(f"endpoints[{i}].host must be non-empty")
         port = _require(ep, "port", int)
         if not 1 <= port <= 65535:
             raise SchemaError(f"endpoints[{i}].port {port} out of range")

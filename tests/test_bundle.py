@@ -135,6 +135,13 @@ class ValidatePayloadTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             validate_payload(p)
 
+    def test_empty_endpoint_host_rejected(self) -> None:
+        p = _sample()
+        p["endpoints"][0]["host"] = ""
+        with self.assertRaises(SchemaError) as ctx:
+            validate_payload(p)
+        self.assertIn("host", str(ctx.exception))
+
     def test_missing_policy_uses_defaults(self) -> None:
         """policy is not required — defaults apply."""
         p = _sample()
