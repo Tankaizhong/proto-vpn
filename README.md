@@ -34,7 +34,7 @@
 | [`scripts/sign_subscription.py`](./scripts/sign_subscription.py) | CLI：生成密钥 / 签发订阅 / 校验 token |
 | [`tests/test_subscription.py`](./tests/test_subscription.py) | 订阅模块单元测试 |
 | [`tests/test_rotation.py`](./tests/test_rotation.py) | 轮换引擎单元测试 |
-| [`tests/test_bundle.py`](./tests/test_bundle.py) | 订阅→轮换集成测试（`python3 -m unittest discover tests` 共 72 例） |
+| [`tests/test_bundle.py`](./tests/test_bundle.py) | 订阅→轮换集成测试（`python -m pytest tests/ -v` 共 101 例） |
 
 ---
 

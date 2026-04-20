@@ -246,6 +246,15 @@ class BuildSelectorTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             build_selector(p)
 
+    def test_all_valid_strategies_propagate(self) -> None:
+        """Each allowed strategy string must survive round-trip into sel.strategy."""
+        for strategy in sorted(ALLOWED_STRATEGIES):
+            with self.subTest(strategy=strategy):
+                p = _sample()
+                p["policy"]["rotation"]["strategy"] = strategy
+                sel, _ = build_selector(p)
+                self.assertEqual(sel.strategy, strategy)
+
 
 class IntegrationTests(unittest.TestCase):
     """End-to-end: sign → verify → build → select."""
