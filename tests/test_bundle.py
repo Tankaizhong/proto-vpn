@@ -148,6 +148,24 @@ class ValidatePayloadTests(unittest.TestCase):
         del p["policy"]
         validate_payload(p)  # must not raise
 
+    def test_wrong_type_port_rejected(self) -> None:
+        """port present but wrong type → _require type-mismatch branch."""
+        p = _sample()
+        p["endpoints"][0]["port"] = "443"
+        with self.assertRaises(SchemaError) as ctx:
+            validate_payload(p)
+        self.assertIn("port", str(ctx.exception))
+        self.assertIn("int", str(ctx.exception))
+
+    def test_wrong_type_weight_rejected(self) -> None:
+        """weight present but wrong type → _optional type-mismatch branch (tuple type_)."""
+        p = _sample()
+        p["endpoints"][0]["weight"] = "heavy"
+        with self.assertRaises(SchemaError) as ctx:
+            validate_payload(p)
+        self.assertIn("weight", str(ctx.exception))
+        self.assertIn("int|float", str(ctx.exception))
+
 
 class BuildConfigTests(unittest.TestCase):
     def test_policy_fields_propagate(self) -> None:
@@ -178,6 +196,14 @@ class BuildConfigTests(unittest.TestCase):
         # Everything else falls back to defaults
         self.assertEqual(cfg.switch_margin, defaults.switch_margin)
         self.assertEqual(cfg.cooldown_base, defaults.cooldown_base)
+
+    def test_wrong_type_policy_field_raises(self) -> None:
+        """A policy numeric field given a string → _optional type-mismatch in build_config."""
+        p = _sample()
+        p["policy"]["rotation"]["min_hold_seconds"] = "slow"
+        with self.assertRaises(SchemaError) as ctx:
+            build_config(p)
+        self.assertIn("min_hold", str(ctx.exception))
 
 
 class BuildEndpointsTests(unittest.TestCase):
