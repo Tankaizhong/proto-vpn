@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proto Composer — 协议组合可视化配置器</title>
+<link rel="stylesheet" href="css/composer.css">
+</head>
+<body>
+
+<header>
+  <h1>Proto Composer</h1>
+  <span class="sub">选择非冲突的协议 + 传输 + TLS + 混淆组合；右侧实时生成 sing-box 入站配置</span>
+</header>
+
+<main>
+  <section class="panel" id="picker">
+    <h2>组合选择</h2>
+    <div class="group" data-key="protocol">
+      <div class="group-title"><strong>1. 协议 (Protocol)</strong><span class="hint">单选</span></div>
+      <div class="options"></div>
+    </div>
+    <div class="group" data-key="transport">
+      <div class="group-title"><strong>2. 传输 (Transport)</strong><span class="hint">单选</span></div>
+      <div class="options"></div>
+    </div>
+    <div class="group" data-key="tls">
+      <div class="group-title"><strong>3. TLS / 握手伪装</strong><span class="hint">单选</span></div>
+      <div class="options"></div>
+    </div>
+    <div class="group" data-key="addons">
+      <div class="group-title"><strong>4. 加固选项 (Addons)</strong><span class="hint">多选</span></div>
+      <div class="options"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="output">
+    <h2>结果</h2>
+    <div id="status"></div>
+    <div class="group-title"><strong>sing-box 入站配置</strong>
+      <span class="hint" id="fingerprint"></span>
+    </div>
+    <pre id="config">（选择后生成）</pre>
+    <div class="row">
+      <button id="copy">复制 JSON</button>
+      <button id="reset">重置选择</button>
+    </div>
+
+    <div class="row lab-row">
+      <button id="run">▶ 开始实验</button>
+      <button id="stop" disabled>■ 停止</button>
+      <a id="download" class="download" download hidden>⬇ 下载 pcap</a>
+      <span id="run-status" class="lab-status"></span>
+    </div>
+    <pre id="run-log" class="lab-log" hidden></pre>
+  </section>
+</main>
+
+<!-- 解耦：核心逻辑与后端通信分离，可独立替换 -->
+<script src="js/composer.js" defer></script>
+<script src="js/lab-client.js" defer></script>
+
+</body>
+</html>
