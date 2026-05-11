@@ -160,7 +160,7 @@ document.addEventListener("alpine:init", () => {
     if (s.transport === "ws") {
       inbound.transport = {
         type: "ws",
-        path: "/ray",
+        path: s.fields.ws_path || "/ray",
         ...(s.addons.has("cdn") ? { headers: { Host: "cdn.example.com" } } : {}),
       };
     } else if (s.transport === "grpc") {
@@ -197,7 +197,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443 } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray" } },
 
     init() {},
 
@@ -236,6 +236,7 @@ document.addEventListener("alpine:init", () => {
       this.state.fields.tls_server_name = "vpn.example.com";
       this.state.fields.reality_handshake_server = "www.microsoft.com";
       this.state.fields.reality_handshake_port = 443;
+      this.state.fields.ws_path = "/ray";
     },
 
     // ----- 派生 -----

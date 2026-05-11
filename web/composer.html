@@ -48,8 +48,8 @@
       </section>
     </template>
 
-    <!-- 5. 字段 (Fields) — 在 TLS 1.3 或 Reality 时显示 -->
-    <section class="opt-group" x-show="$store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality'">
+    <!-- 5. 字段 (Fields) — 在 TLS 1.3 / Reality / WS 传输时显示 -->
+    <section class="opt-group" x-show="$store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality' || $store.composer.state.transport === 'ws'">
       <h3>5. 字段 (Fields) <small>可选</small></h3>
       <div class="field-row" x-show="$store.composer.state.tls === 'tls'">
         <label for="tls_server_name">TLS server_name</label>
@@ -65,6 +65,11 @@
         <label for="reality_handshake_port">Reality 握手端口</label>
         <input id="reality_handshake_port" type="number" min="1" max="65535" placeholder="443"
                x-model.number="$store.composer.state.fields.reality_handshake_port">
+      </div>
+      <div class="field-row" x-show="$store.composer.state.transport === 'ws'">
+        <label for="ws_path">WS path</label>
+        <input id="ws_path" type="text" placeholder="/ray"
+               x-model="$store.composer.state.fields.ws_path">
       </div>
     </section>
   </article>
