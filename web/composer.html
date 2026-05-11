@@ -47,6 +47,16 @@
         </div>
       </section>
     </template>
+
+    <!-- 5. 字段 (Fields) — 仅在选择了 TLS 1.3 时显示 -->
+    <section class="opt-group" x-show="$store.composer.state.tls === 'tls'">
+      <h3>5. 字段 (Fields) <small>可选</small></h3>
+      <div class="field-row">
+        <label for="tls_server_name">TLS server_name</label>
+        <input id="tls_server_name" type="text" placeholder="vpn.example.com"
+               x-model="$store.composer.state.fields.tls_server_name">
+      </div>
+    </section>
   </article>
 
   <!-- 结果 + 后端控制 -->

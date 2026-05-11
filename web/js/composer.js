@@ -89,7 +89,7 @@ document.addEventListener("alpine:init", () => {
     if (group === "addons" && id === "ech" && s.tls !== "tls")
       return "ECH 仅在 TLS 模式下可用（与 Reality / 无 TLS 互斥）";
     if (group === "tls" && id !== "tls" && s.addons && s.addons.has && s.addons.has("ech"))
-      return "已启用 ECH，TLS 模式必须为 “TLS 1.3”";
+      return "已启用 ECH，TLS 模式必须为 \"TLS 1.3\"";
 
     return null;
   }
@@ -130,7 +130,7 @@ document.addEventListener("alpine:init", () => {
     if (s.tls === "tls") {
       inbound.tls = {
         enabled: true,
-        server_name: "vpn.example.com",
+        server_name: s.fields.tls_server_name || "vpn.example.com",
         certificate_path: "/etc/ssl/fullchain.pem",
         key_path: "/etc/ssl/privkey.pem",
         ...(s.addons.has("utls") ? { utls: { enabled: true, fingerprint: "chrome" } } : {}),
@@ -195,7 +195,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set() },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com" } },
 
     init() {},
 
@@ -231,6 +231,7 @@ document.addEventListener("alpine:init", () => {
       this.state.transport = null;
       this.state.tls = null;
       this.state.addons = new Set();
+      this.state.fields.tls_server_name = "vpn.example.com";
     },
 
     // ----- 派生 -----
