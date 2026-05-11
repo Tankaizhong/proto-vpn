@@ -142,12 +142,14 @@ document.addEventListener("alpine:init", () => {
         } : {}),
       };
     } else if (s.tls === "reality") {
+      const rHost = s.fields.reality_handshake_server || "www.microsoft.com";
+      const rPort = parseInt(s.fields.reality_handshake_port) || 443;
       inbound.tls = {
         enabled: true,
-        server_name: "www.microsoft.com",
+        server_name: rHost,
         reality: {
           enabled: true,
-          handshake: { server: "www.microsoft.com", server_port: 443 },
+          handshake: { server: rHost, server_port: rPort },
           private_key: "REPLACE-REALITY-PRIV",
           short_id: ["REPLACE-HEX"],
         },
@@ -195,7 +197,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com" } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443 } },
 
     init() {},
 
@@ -232,6 +234,8 @@ document.addEventListener("alpine:init", () => {
       this.state.tls = null;
       this.state.addons = new Set();
       this.state.fields.tls_server_name = "vpn.example.com";
+      this.state.fields.reality_handshake_server = "www.microsoft.com";
+      this.state.fields.reality_handshake_port = 443;
     },
 
     // ----- 派生 -----
