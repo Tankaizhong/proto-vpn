@@ -10,12 +10,10 @@ from pathlib import Path
 # 锚点 = 项目根（src/proto/composer/settings.py → 上溯 4 层）
 BASE_DIR: Path = Path(__file__).resolve().parents[3]
 WEB_DIR: Path = BASE_DIR / "web"
-VAR_DIR: Path = BASE_DIR / "var"
-RUNS_DIR: Path = VAR_DIR / "runs"           # 每个 run 一个子目录，pcap/logs/configs 全在里面
+DATA_DIR: Path = BASE_DIR / "data"          # 每个 run 一个子目录，pcap/logs/configs 全在里面
 
 # 副作用：保证运行时目录存在
-for _d in (VAR_DIR, RUNS_DIR):
-    _d.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
 
 # ---------- 端口 (全部 loopback) ----------
 SERVER_PORT: int = 8443   # sing-box 服务端 inbound

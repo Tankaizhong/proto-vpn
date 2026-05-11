@@ -9,8 +9,8 @@ venv/
 build/
 dist/
 
-# Runtime data (composer 实验产物 — pcaps / runs / logs 全部在 var/ 下)
-var/
+# Runtime data (composer 实验产物 — pcaps / configs / logs 每个 run 一个子目录)
+data/
 
 # 旧 lab 沙盒（项目重组前的残留）
 lab/

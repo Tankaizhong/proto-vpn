@@ -1,64 +1,114 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Proto Composer — 协议组合可视化配置器</title>
+<link rel="stylesheet" href="vendor/pico.min.css">
 <link rel="stylesheet" href="css/composer.css">
 </head>
 <body>
 
-<header>
-  <h1>Proto Composer</h1>
-  <span class="sub">选择非冲突的协议 + 传输 + TLS + 混淆组合；右侧实时生成 sing-box 入站配置</span>
+<header class="container">
+  <hgroup>
+    <h1>Proto Composer</h1>
+    <p>选择非冲突的协议 + 传输 + TLS + 混淆组合；右侧实时生成 sing-box 入站配置</p>
+  </hgroup>
 </header>
 
-<main>
-  <section class="panel" id="picker">
-    <h2>组合选择</h2>
-    <div class="group" data-key="protocol">
-      <div class="group-title"><strong>1. 协议 (Protocol)</strong><span class="hint">单选</span></div>
-      <div class="options"></div>
-    </div>
-    <div class="group" data-key="transport">
-      <div class="group-title"><strong>2. 传输 (Transport)</strong><span class="hint">单选</span></div>
-      <div class="options"></div>
-    </div>
-    <div class="group" data-key="tls">
-      <div class="group-title"><strong>3. TLS / 握手伪装</strong><span class="hint">单选</span></div>
-      <div class="options"></div>
-    </div>
-    <div class="group" data-key="addons">
-      <div class="group-title"><strong>4. 加固选项 (Addons)</strong><span class="hint">多选</span></div>
-      <div class="options"></div>
-    </div>
-  </section>
+<main class="container grid">
+  <!-- 组合选择 -->
+  <article x-data x-init="$store.composer.init()">
+    <header><h2>组合选择</h2></header>
 
-  <section class="panel" id="output">
-    <h2>结果</h2>
-    <div id="status"></div>
-    <div class="group-title"><strong>sing-box 入站配置</strong>
-      <span class="hint" id="fingerprint"></span>
-    </div>
-    <pre id="config">（选择后生成）</pre>
-    <div class="row">
-      <button id="copy">复制 JSON</button>
-      <button id="reset">重置选择</button>
+    <template x-for="(group, key) in $store.composer.groups" :key="key">
+      <section class="opt-group">
+        <h3>
+          <span x-text="group.title"></span>
+          <small x-text="group.multi ? '多选' : '单选'"></small>
+        </h3>
+        <div class="opt-grid">
+          <template x-for="opt in group.options" :key="opt.id">
+            <button
+              type="button"
+              class="opt"
+              :class="{
+                active: $store.composer.isSelected(key, opt.id),
+                disabled: !$store.composer.canSelect(key, opt.id),
+              }"
+              :disabled="!$store.composer.canSelect(key, opt.id)"
+              :aria-pressed="$store.composer.isSelected(key, opt.id)"
+              @click="$store.composer.toggle(key, opt.id)"
+              :title="$store.composer.disabledReason(key, opt.id) || opt.desc">
+              <strong x-text="opt.label"></strong>
+              <small x-text="opt.desc"></small>
+            </button>
+          </template>
+        </div>
+      </section>
+    </template>
+  </article>
+
+  <!-- 结果 + 后端控制 -->
+  <article x-data="lab">
+    <header><h2>结果</h2></header>
+
+    <!-- 状态提示 -->
+    <template x-if="$store.composer.missing.length">
+      <p class="status warn">
+        ⚠ 还需选择：<span x-text="$store.composer.missing.join(' / ')"></span>
+      </p>
+    </template>
+    <template x-if="!$store.composer.missing.length && $store.composer.conflicts.length">
+      <div class="status err">
+        <strong>组合存在冲突：</strong>
+        <ul>
+          <template x-for="c in $store.composer.conflicts" :key="c">
+            <li x-text="c"></li>
+          </template>
+        </ul>
+      </div>
+    </template>
+    <template x-if="$store.composer.isReady">
+      <p class="status ok">
+        ✓ 组合无冲突：<code x-text="$store.composer.fingerprint"></code>
+      </p>
+    </template>
+
+    <!-- 配置预览 -->
+    <h3>sing-box 入站配置</h3>
+    <pre x-html="$store.composer.coloredJSON" class="json"></pre>
+
+    <!-- 静态按钮 -->
+    <div role="group">
+      <button type="button" class="secondary"
+              @click="$store.composer.copyJSON($el)"
+              :disabled="!$store.composer.isReady">复制 JSON</button>
+      <button type="button" class="secondary outline"
+              @click="$store.composer.reset()">重置选择</button>
     </div>
 
-    <div class="row lab-row">
-      <button id="run">▶ 开始实验</button>
-      <button id="stop" disabled>■ 停止</button>
-      <a id="download" class="download" download hidden>⬇ 下载 pcap</a>
-      <span id="run-status" class="lab-status"></span>
+    <!-- lab 按钮 -->
+    <div role="group" class="lab-row">
+      <button type="button"
+              @click="start()"
+              :disabled="running || !$store.composer.isReady">▶ 生成 pcap</button>
+      <button type="button" class="secondary"
+              @click="stop()"
+              :disabled="!running">■ 停止</button>
+      <a class="download" :href="pcapUrl" :hidden="!pcapUrl" download>⬇ 下载 pcap</a>
+      <span class="lab-status" x-text="statusText"></span>
     </div>
-    <pre id="run-log" class="lab-log" hidden></pre>
-  </section>
+
+    <pre class="lab-log" x-text="logText" :hidden="!logText"></pre>
+  </article>
 </main>
 
-<!-- 解耦：核心逻辑与后端通信分离，可独立替换 -->
-<script src="js/composer.js" defer></script>
+<!-- 顺序很关键：业务 JS 必须先 load 注册 alpine:init 监听器，然后 Alpine 加载并 fire 事件 -->
 <script src="js/lab-client.js" defer></script>
+<script src="js/composer.js" defer></script>
+
+<script src="vendor/alpinejs.min.js" defer></script>
 
 </body>
 </html>

@@ -38,7 +38,17 @@ app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
 def main() -> None:
     import uvicorn
     print(f"打开浏览器: http://127.0.0.1:{HTTP_PORT}/web/composer.html")
-    uvicorn.run(app, host="127.0.0.1", port=HTTP_PORT)
+    # reload=True 必须用 import string；uvicorn 才能在 .py 文件变更后重新 import 模块
+    # 关键：限制监控范围，否则 data/<id>/{pcap,log,json} 文件写入会被认为是源码变更
+    # 触发 backend 重启，杀掉正在跑的 sing-box，前端报错。
+    uvicorn.run(
+        "app:app",
+        host="127.0.0.1",
+        port=HTTP_PORT,
+        reload=True,
+        reload_dirs=["src", "."],     # 只看 src 子树和当前目录的 Python
+        reload_includes=["*.py"],     # 只 .py 变更才重启；忽略 pcap/json/log/css/js
+    )
 
 
 if __name__ == "__main__":

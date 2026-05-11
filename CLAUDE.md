@@ -70,14 +70,14 @@ Removing the composer backend doesn't break `composer.js` — only the run/stop 
 ## Runtime data layout
 
 ```
-var/runs/<run_id>/
+data/<run_id>/
 ├── server.json + client.json    (config snapshots, replayable)
-├── capture.pcap                 (binary capture)
+├── <protocol-tag>.pcap          (binary capture, named after inbound tag)
 └── logs/
     └── server.log + client.log + tcpdump.log + traffic.log
 ```
 
-Everything for one experiment lives under a single `var/runs/<run_id>/` directory — easy to zip, share, or delete a single run. `run_id` format: `YYYYMMDD-HHMMSS-XXXX` (4-hex suffix). All of `var/` is gitignored. PCAP HTTP route: `GET /runs/{run_id}/pcap`. Concurrent runs are not supported — the runner rejects a new `start_run` while one is active (HTTP 409).
+Everything for one experiment lives under a single `data/<run_id>/` directory — easy to zip, share, or delete a single run. `run_id` format: `YYYYMMDD-HHMMSS-XXXX` (4-hex suffix). The pcap filename is derived from the inbound's `tag` (or `type` if no tag) via `runner._pcap_filename`, e.g. `trojan-tcp-tls-utls.pcap`. All of `data/` is gitignored. PCAP HTTP route: `GET /runs/{run_id}/pcap`. Concurrent runs are not supported — the runner rejects a new `start_run` while one is active (HTTP 409).
 
 ## Conventions
 

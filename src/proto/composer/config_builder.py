@@ -5,17 +5,20 @@
 `secrets` 参数传入。本模块只做模板填充与 dispatch。
 
 `secrets` 字典字段（按协议/TLS 模式可选）:
-    password       : str  (ss2022 / trojan / hy2)
-    uuid           : str  (vless / vmess)
-    reality_priv   : str  (vless + reality)
-    reality_pub    : str  (vless + reality)
-    short_id       : str  (reality)
-    cert_path      : str  (非 reality 的 TLS)
-    key_path       : str  (非 reality 的 TLS)
+    password         : str       (ss2022 / trojan / hy2)
+    uuid             : str       (vless / vmess)
+    reality_priv     : str       (vless + reality)
+    reality_pub      : str       (vless + reality)
+    short_id         : str       (reality)
+    cert_path        : str       (非 reality 的 TLS)
+    key_path         : str       (非 reality 的 TLS)
+    ech_key_lines    : list[str] (启用 ECH 时的私钥 PEM 行；server 用)
+    ech_config_lines : list[str] (启用 ECH 时的 ECHConfigList PEM 行；client 用)
 """
 from __future__ import annotations
 
 import base64
+import copy
 import secrets as _secrets
 import time
 import uuid
@@ -120,7 +123,9 @@ def _vless_outbound(inb: dict, secrets: dict) -> dict:
 
 
 def _vmess_outbound(inb: dict, secrets: dict) -> dict:
-    return {"uuid": secrets["uuid"], "alterId": 0}
+    # sing-box outbound 用 alter_id (snake_case) 与 inbound users[].alterId 不一致；
+    # 现代 AEAD VMess 默认 alter_id=0，直接省略最稳。
+    return {"uuid": secrets["uuid"]}
 
 
 _OUTBOUNDS = {
@@ -130,6 +135,10 @@ _OUTBOUNDS = {
     "vless":       _vless_outbound,
     "vmess":       _vmess_outbound,
 }
+
+# sing-box 在以下协议上支持 multiplex/smux 字段；其它（hysteria2 自带 QUIC stream
+# 多路复用，naive 用 HTTP/2，等）解析时会报 unknown field "multiplex"。
+_MULTIPLEX_PROTOS = frozenset({"shadowsocks", "trojan", "vless", "vmess"})
 
 
 # ====================================================================
@@ -148,6 +157,14 @@ def _inject_server_tls(inb: dict, secrets: dict) -> None:
         # 普通 TLS：覆盖 cert/key 路径为本次 run 自签出来的
         tls["certificate_path"] = secrets["cert_path"]
         tls["key_path"] = secrets["key_path"]
+    # ECH：把前端占位的 ech.key 替换为本次 run 生成的真实 PEM 行
+    if "ech" in tls and tls["ech"].get("enabled"):
+        tls["ech"]["key"] = list(secrets["ech_key_lines"])
+        # server 侧的 ech 块只接受 key / key_path，移除任何被误带入的 config 字段
+        tls["ech"].pop("config", None)
+        tls["ech"].pop("config_path", None)
+    # sing-box server-side TLS schema 不识别 utls（仅 outbound 用）
+    tls.pop("utls", None)
 
 
 # ====================================================================
@@ -159,9 +176,12 @@ def build_server_config(inbound: dict, secrets: dict) -> dict:
     if proto not in _INJECTORS:
         raise ValueError(f"unsupported protocol: {proto}")
 
-    inb = dict(inbound)
+    # 深拷贝避免污染入参（_inject_server_tls 会就地修改子结构）
+    inb = copy.deepcopy(inbound)
     inb["listen"] = "127.0.0.1"
     inb["listen_port"] = SERVER_PORT
+    if proto not in _MULTIPLEX_PROTOS:
+        inb.pop("multiplex", None)   # hy2 / 其它不支持 multiplex 的协议
     inb = _INJECTORS[proto](inb, secrets)
     _inject_server_tls(inb, secrets)
 
@@ -179,6 +199,7 @@ def build_client_config(inbound: dict, secrets: dict) -> dict:
     if proto not in _OUTBOUNDS:
         raise ValueError(f"unsupported protocol: {proto}")
 
+    inbound = copy.deepcopy(inbound)  # 防止后续 dict(inbound["transport"]) 等浅引用污染
     out: dict = {
         "type": proto,
         "tag": "proxy",
@@ -209,10 +230,16 @@ def build_client_config(inbound: dict, secrets: dict) -> dict:
             client_tls["insecure"] = True
         if "utls" in src_tls:
             client_tls["utls"] = dict(src_tls["utls"])
+        # ECH：client 用 ECHConfigList（公开），与 server 的 key 是配对的
+        if "ech" in src_tls and src_tls["ech"].get("enabled"):
+            client_tls["ech"] = {
+                "enabled": True,
+                "config": list(secrets["ech_config_lines"]),
+            }
         out["tls"] = client_tls
 
-    # multiplex / padding
-    if "multiplex" in inbound:
+    # multiplex / padding（hy2 等不支持 mux 的协议跳过）
+    if "multiplex" in inbound and proto in _MULTIPLEX_PROTOS:
         out["multiplex"] = {**inbound["multiplex"], "protocol": "smux"}
 
     return {

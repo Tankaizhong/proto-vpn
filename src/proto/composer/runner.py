@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -23,7 +24,7 @@ from .config_builder import (
     gen_uuid,
 )
 from .settings import (
-    RUNS_DIR,
+    DATA_DIR,
     SERVER_PORT,
     SOCKS_PORT,
     SUPPORTED_PROTOCOLS,
@@ -69,25 +70,74 @@ def _check_singbox_config(path: Path) -> str | None:
     return None if r.returncode == 0 else (r.stderr or r.stdout)
 
 
+_SAFE_NAME_RE = re.compile(r"[^a-z0-9._-]+")
+
+
+def _pcap_filename(inbound: dict) -> str:
+    """从 inbound 的 tag（或 type）派生 pcap 文件名，编码协议+混淆组合。
+
+    例：tag="trojan-tcp-tls-utls" → "trojan-tcp-tls-utls.pcap"
+        无 tag → 退化为 "{type}.pcap"
+    只保留 [a-z0-9._-]，避免文件系统/URL 兼容问题。
+    """
+    raw = str(inbound.get("tag") or inbound.get("type") or "capture").strip().lower()
+    safe = _SAFE_NAME_RE.sub("-", raw).strip("-.") or "capture"
+    return f"{safe}.pcap"
+
+
+def _is_tcpdump(p: subprocess.Popen) -> bool:
+    args = p.args
+    if isinstance(args, (list, tuple)) and args:
+        return str(args[0]).endswith("tcpdump")
+    return isinstance(args, str) and "tcpdump" in args
+
+
 def _terminate(procs: list[subprocess.Popen]) -> None:
-    for p in reversed(procs):
+    """优雅关停：先停 traffic/client/server，最后单独停 tcpdump 并等它 flush。
+
+    顺序很关键：tcpdump 必须在所有其他进程退出后才停，否则关停过程中产生的最后
+    一批包会丢；tcpdump 收到 SIGTERM 后需要 ~1s 把 BPF buffer 抽干并写 pcap
+    trailer，必须 wait 而不是固定 sleep —— 否则 capinfos 会报
+    "appears to have been cut short in the middle of a packet"。
+    """
+    tcpdump_procs = [p for p in procs if _is_tcpdump(p)]
+    others = [p for p in procs if not _is_tcpdump(p)]
+
+    for p in reversed(others):
         if p.poll() is None:
             try:
                 p.terminate()
             except Exception:
                 pass
-    time.sleep(0.4)
-    for p in procs:
+    for p in others:
         if p.poll() is None:
             try:
-                p.kill()
+                p.wait(timeout=1.5)
+            except subprocess.TimeoutExpired:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+
+    for p in tcpdump_procs:
+        if p.poll() is None:
+            try:
+                p.terminate()
             except Exception:
                 pass
+            try:
+                p.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
 
 
 def _spawn_tcpdump(pcap: Path, log_fp) -> subprocess.Popen:
+    # -U: packet-buffered，每个包立即写盘，避免 SIGTERM 后丢失尾部 buffer
     return subprocess.Popen(
-        ["tcpdump", "-i", "lo", "-n", "-w", str(pcap), f"port {SERVER_PORT}"],
+        ["tcpdump", "-i", "lo", "-U", "-n", "-w", str(pcap), f"port {SERVER_PORT}"],
         stdout=log_fp, stderr=subprocess.STDOUT,
     )
 
@@ -137,6 +187,45 @@ def _gen_reality_keypair() -> tuple[str, str]:
     return priv, pub
 
 
+def _gen_ech_keypair(server_name: str) -> tuple[list[str], list[str]]:
+    """调 `sing-box generate ech-keypair <server_name>`，返回 (key_lines, config_lines)。
+
+    输出有两段 PEM block：
+        -----BEGIN ECH CONFIGS-----  ...  -----END ECH CONFIGS-----   # 客户端用
+        -----BEGIN ECH KEYS-----     ...  -----END ECH KEYS-----      # 服务端用
+    顺序不固定，按 marker 分桶解析；每段保留完整 BEGIN/END 行，便于直接放进
+    sing-box 的 tls.ech.key / tls.ech.config 字符串数组。
+    """
+    r = subprocess.run(
+        ["sing-box", "generate", "ech-keypair", server_name],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RunnerError(
+            500,
+            f"sing-box generate ech-keypair 失败（需要 sing-box ≥ 1.8）: "
+            f"{r.stderr or r.stdout}",
+        )
+
+    key_lines: list[str] = []
+    config_lines: list[str] = []
+    current: list[str] | None = None
+    for raw in r.stdout.splitlines():
+        line = raw.rstrip()
+        if line.startswith("-----BEGIN ECH KEYS"):
+            current = key_lines
+        elif line.startswith("-----BEGIN ECH CONFIGS"):
+            current = config_lines
+        if current is not None:
+            current.append(line)
+        if line.startswith("-----END ECH"):
+            current = None
+
+    if not key_lines or not config_lines:
+        raise RunnerError(500, f"无法从 sing-box 输出解析 ECH PEM block: {r.stdout!r}")
+    return key_lines, config_lines
+
+
 def _gen_self_signed_cert(run_dir: Path) -> tuple[Path, Path]:
     """openssl 现签 RSA 2048 自签证书，CN=test.local，1 天有效。"""
     cert = run_dir / "cert.pem"
@@ -180,6 +269,13 @@ def _prepare_secrets(inbound: dict, run_dir: Path) -> dict:
             cert, key = _gen_self_signed_cert(run_dir)
             secrets["cert_path"] = str(cert)
             secrets["key_path"] = str(key)
+            # ECH 与 Reality 在 schema 上互斥（前端冲突规则已拦截），所以放在 else 分支里
+            ech_cfg = tls_cfg.get("ech")
+            if ech_cfg and ech_cfg.get("enabled"):
+                server_name = tls_cfg.get("server_name") or "vpn.example.com"
+                key_lines, config_lines = _gen_ech_keypair(server_name)
+                secrets["ech_key_lines"] = key_lines
+                secrets["ech_config_lines"] = config_lines
     return secrets
 
 
@@ -198,8 +294,8 @@ async def start_run(inbound: dict, duration: int) -> dict:
         )
 
     run_id = gen_run_id()
-    run_dir = RUNS_DIR / run_id          # var/runs/<id>/        ← 全产物根
-    log_dir = run_dir / "logs"           # var/runs/<id>/logs/   ← 4 个 .log
+    run_dir = DATA_DIR / run_id          # data/<id>/        ← 全产物根
+    log_dir = run_dir / "logs"           # data/<id>/logs/   ← 4 个 .log
     run_dir.mkdir()
     log_dir.mkdir()
 
@@ -216,7 +312,7 @@ async def start_run(inbound: dict, duration: int) -> dict:
     if err := _check_singbox_config(client_path):
         raise RunnerError(400, f"client config invalid: {err}")
 
-    pcap_path = run_dir / "capture.pcap"
+    pcap_path = run_dir / _pcap_filename(inbound)
     procs: list[subprocess.Popen] = []
 
     # 1) tcpdump 先起

@@ -1,155 +1,107 @@
-// lab-client.js
-// 与 lab/server.py 后端通信，实现"开始 / 停止 / 下载 pcap"。
-// 依赖 composer.js 暴露的全局 buildConfig(state) 与 state。
+// lab-client.js — Alpine 组件: 后端 fetch + run/stop/poll
+//
+// HTML 用 <article x-data="lab"> 引入。
+// 通过 Alpine.store('composer').buildConfig() 取 inbound 配置。
 
-(function () {
-  const API = "";  // 同源，由 lab/server.py 静态托管
-  const $ = (id) => document.getElementById(id);
+document.addEventListener("alpine:init", () => {
 
-  let currentRunId = null;
-  let pollTimer = null;
-
-  // ---------- UI helpers ----------
-  function setRunningUI(running) {
-    $("run").disabled = running;
-    $("stop").disabled = !running;
-    if (!running) {
-      $("run-status").textContent = "";
-    }
-  }
-
-  function appendLog(msg) {
-    const el = $("run-log");
-    el.hidden = false;
-    el.textContent += msg + "\n";
-    el.scrollTop = el.scrollHeight;
-  }
-
-  function clearLog() {
-    const el = $("run-log");
-    el.textContent = "";
-    el.hidden = true;
-  }
-
-  function showDownload(pcapUrl) {
-    const a = $("download");
-    a.href = pcapUrl;
-    a.hidden = false;
-  }
-
-  function hideDownload() {
-    const a = $("download");
-    a.hidden = true;
-    a.removeAttribute("href");
-  }
-
-  // ---------- API calls ----------
   async function postJSON(url, body) {
-    const res = await fetch(API + url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.detail || res.statusText);
-    }
+    if (!res.ok) throw new Error(data.detail || res.statusText);
     return data;
   }
 
   async function getJSON(url) {
-    const res = await fetch(API + url);
+    const res = await fetch(url);
     if (!res.ok) throw new Error(res.statusText);
     return res.json();
   }
 
-  // ---------- run lifecycle ----------
-  async function startRun() {
-    if (typeof window.buildConfig !== "function" || !window.state) {
-      alert("composer.js 未加载，刷新页面重试");
-      return;
-    }
-    const s = window.state;
-    if (!s.protocol || !s.transport || !s.tls) {
-      alert("请先完成必选项（协议 / 传输 / TLS）");
-      return;
-    }
-    const inbound = window.buildConfig(s);
+  Alpine.data("lab", () => ({
+    runId: null,
+    running: false,
+    statusText: "",
+    logText: "",
+    pcapUrl: null,
+    _pollTimer: null,
 
-    clearLog();
-    hideDownload();
-    setRunningUI(true);
-    appendLog(`▶ 提交 inbound: ${inbound.tag || inbound.type}`);
+    _log(msg) {
+      this.logText += msg + "\n";
+    },
 
-    try {
-      const data = await postJSON("/run", { inbound, duration: 30 });
-      currentRunId = data.run_id;
-      appendLog(`✓ run_id=${data.run_id}, duration=${data.duration}s`);
-      appendLog(`  pcap 将落到 ${data.pcap_url}`);
-      startPolling();
-    } catch (e) {
-      appendLog(`✗ 启动失败: ${e.message}`);
-      setRunningUI(false);
-    }
-  }
-
-  async function stopRun() {
-    if (!currentRunId) return;
-    stopPolling();
-    try {
-      const data = await postJSON(`/stop/${currentRunId}`, {});
-      appendLog(`■ 已停止 (${data.reason}, 用时 ${data.elapsed_sec}s, pcap ${data.pcap_size_bytes} bytes)`);
-      showDownload(data.pcap_url);
-    } catch (e) {
-      appendLog(`✗ 停止失败: ${e.message}`);
-    } finally {
-      currentRunId = null;
-      setRunningUI(false);
-    }
-  }
-
-  // ---------- polling ----------
-  function startPolling() {
-    stopPolling();
-    pollTimer = setInterval(async () => {
-      try {
-        const s = await getJSON("/status");
-        const me = s.active_runs.find((r) => r.run_id === currentRunId);
-        if (me) {
-          $("run-status").textContent =
-            `运行中 ${me.elapsed_sec.toFixed(0)}s / ${me.duration}s`;
-        } else {
-          appendLog("◷ 后端达到时长上限，已自动停止");
-          showDownload(`/runs/${currentRunId}/pcap`);
-          currentRunId = null;
-          setRunningUI(false);
-          stopPolling();
-        }
-      } catch (e) {
-        // 静默：偶发网络抖动
+    async start() {
+      const composer = Alpine.store("composer");
+      if (!composer.isReady) {
+        alert("请先完成必选项并解决冲突");
+        return;
       }
-    }, 1000);
-  }
+      const inbound = composer.buildConfig();
 
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
+      this.logText = "";
+      this.pcapUrl = null;
+      this.running = true;
+      this._log(`▶ 提交 inbound: ${inbound.tag || inbound.type}`);
 
-  // ---------- bind ----------
-  function init() {
-    const runBtn = $("run");
-    const stopBtn = $("stop");
-    if (!runBtn || !stopBtn) return;
-    runBtn.addEventListener("click", startRun);
-    stopBtn.addEventListener("click", stopRun);
-  }
+      try {
+        const data = await postJSON("/run", { inbound, duration: 30 });
+        this.runId = data.run_id;
+        this._log(`✓ run_id=${data.run_id}, duration=${data.duration}s`);
+        this._log(`  pcap → ${data.pcap_url}`);
+        this._startPolling();
+      } catch (e) {
+        this._log(`✗ 启动失败: ${e.message}`);
+        this.running = false;
+      }
+    },
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-})();
+    async stop() {
+      if (!this.runId) return;
+      this._stopPolling();
+      try {
+        const data = await postJSON(`/stop/${this.runId}`, {});
+        this._log(`■ 已停止 (${data.reason}, 用时 ${data.elapsed_sec}s, pcap ${data.pcap_size_bytes} bytes)`);
+        this.pcapUrl = data.pcap_url;
+      } catch (e) {
+        this._log(`✗ 停止失败: ${e.message}`);
+      } finally {
+        this.runId = null;
+        this.running = false;
+        this.statusText = "";
+      }
+    },
+
+    _startPolling() {
+      this._stopPolling();
+      this._pollTimer = setInterval(async () => {
+        try {
+          const s = await getJSON("/status");
+          const me = s.active_runs.find((r) => r.run_id === this.runId);
+          if (me) {
+            this.statusText = `运行中 ${me.elapsed_sec.toFixed(0)}s / ${me.duration}s`;
+          } else {
+            this._log("◷ 后端达到时长上限，已自动停止");
+            this.pcapUrl = `/runs/${this.runId}/pcap`;
+            this.runId = null;
+            this.running = false;
+            this.statusText = "";
+            this._stopPolling();
+          }
+        } catch (_) {
+          // 静默：偶发网络抖动
+        }
+      }, 1000);
+    },
+
+    _stopPolling() {
+      if (this._pollTimer) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      }
+    },
+  }));
+});

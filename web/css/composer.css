@@ -1,155 +1,136 @@
-  :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --panel-2: #1f232c;
-    --border: #2a2f3a;
-    --text: #e6e8ec;
-    --muted: #8b92a1;
-    --accent: #6ea8fe;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --err: #f87171;
-    --pill: #2a2f3a;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
-  }
-  header {
-    padding: 20px 28px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-  }
-  header h1 { font-size: 20px; margin: 0; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  main {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    padding: 24px 28px;
-    max-width: 1400px;
-  }
-  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+/* 仅 Pico 不覆盖的部分：选项网格、JSON 配色、lab 行 */
 
-  section.panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
-  }
-  h2 {
-    font-size: 14px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin: 0 0 14px 0;
-  }
-  .group { margin-bottom: 18px; }
-  .group-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-  .group-title strong { font-size: 14px; }
-  .group-title .hint { font-size: 11px; color: var(--muted); }
+/* ---------- 主题微调（在 Pico 暗色基础上） ---------- */
+:root {
+  --pico-form-element-spacing-vertical: 0.4rem;
+  --pico-form-element-spacing-horizontal: 0.6rem;
+}
+[data-theme="dark"] {
+  --proto-active: #6ea8fe;
+  --proto-warn:   #fbbf24;
+  --proto-ok:     #4ade80;
+  --proto-err:    #f87171;
+}
 
-  .options { display: flex; flex-wrap: wrap; gap: 8px; }
-  .opt {
-    background: var(--pill);
-    color: var(--text);
-    border: 1px solid transparent;
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
-  }
-  .opt:hover { background: #333948; }
-  .opt.selected {
-    background: rgba(110, 168, 254, 0.18);
-    border-color: var(--accent);
-    color: #cfe0ff;
-  }
-  .opt.disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    text-decoration: line-through;
-  }
-  .opt .why {
-    display: block;
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
+main.container.grid {
+  align-items: start;
+  gap: 1.5rem;
+}
 
-  .status {
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
-    font-size: 13px;
-  }
-  .status.ok  { background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.4); color: #a7f3d0; }
-  .status.err { background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.4); color: #fecaca; }
-  .status ul { margin: 6px 0 0 0; padding-left: 20px; }
+/* ---------- 选项分组 ---------- */
+.opt-group {
+  margin-block: 1rem;
+}
+.opt-group h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pico-muted-color);
+  margin: 0 0 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.opt-group h3 small {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--pico-muted-color);
+}
 
-  pre {
-    background: #0b0d12;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    margin: 0;
-    overflow: auto;
-    font-size: 12px;
-    line-height: 1.55;
-    max-height: 520px;
-  }
-  .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
-  button {
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  button:hover { background: #2a2f3a; }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .k { color: #7dd3fc; }
-  .s { color: #c3e88d; }
-  .n { color: #f78c6c; }
+/* ---------- 选项按钮（pill） ---------- */
+.opt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+}
+.opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  color: var(--pico-color);
+  cursor: pointer;
+  transition: all 120ms ease;
+  margin: 0;            /* override Pico button default */
+}
+.opt strong { font-size: 0.92rem; }
+.opt small {
+  display: block;
+  margin-top: 2px;
+  color: var(--pico-muted-color);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+.opt:hover:not(:disabled) {
+  border-color: var(--proto-active);
+}
+.opt.active {
+  border-color: var(--proto-active);
+  background: color-mix(in oklab, var(--proto-active) 12%, transparent);
+}
+.opt.active strong { color: var(--proto-active); }
+.opt:disabled,
+.opt.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
-  /* ---------- lab integration UI ---------- */
-  .lab-row {
-    margin-top: 12px;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .lab-row .download {
-    color: #9cf;
-    text-decoration: underline;
-  }
-  .lab-row .lab-status {
-    margin-left: auto;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  .lab-log {
-    margin-top: 8px;
-    max-height: 160px;
-    overflow: auto;
-    background: #0d0f14;
-    padding: 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    color: var(--muted);
-  }
+/* ---------- 状态行 ---------- */
+.status {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--pico-border-radius);
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+.status.ok   { background: color-mix(in oklab, var(--proto-ok)   18%, transparent); }
+.status.warn { background: color-mix(in oklab, var(--proto-warn) 18%, transparent); }
+.status.err  { background: color-mix(in oklab, var(--proto-err)  18%, transparent); }
+.status.err ul { margin: 0.3rem 0 0 1.2rem; }
+.status code   { background: transparent; padding: 0; }
+
+/* ---------- JSON 预览 ---------- */
+pre.json {
+  background: #0d0f14;
+  font-size: 20px;
+  line-height: 1.5;
+  max-height: 360px;
+  overflow: auto;
+  padding: 0.85rem 1rem;
+}
+pre.json .k { color: #7dd3fc; }   /* keys */
+pre.json .s { color: #c3e88d; }   /* strings */
+pre.json .n { color: #f78c6c; }   /* numbers */
+
+/* ---------- lab 行（开始/停止/下载/状态/日志） ---------- */
+.lab-row {
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+.lab-row .download {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+.lab-row .lab-status {
+  margin-left: auto;
+  color: var(--pico-muted-color);
+  font-size: 1rem;          /* ~16px；想更大改 1.1rem 或 18px / 20px */
+  font-variant-numeric: tabular-nums;
+}
+.lab-log {
+  background: #0d0f14;
+  color: #d4d8e4;
+  font-size: 20px;
+  line-height: 1.55;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.75rem 1rem;
+  margin-top: 0.6rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

@@ -14,7 +14,7 @@ from .settings import (
     DURATION_DEFAULT,
     DURATION_MAX,
     DURATION_MIN,
-    RUNS_DIR,
+    DATA_DIR,
 )
 
 
@@ -64,9 +64,10 @@ async def post_stop(run_id: str):
 @router.get("/status")
 async def get_status():
     pcaps = []
-    for pcap in sorted(RUNS_DIR.glob("*/capture.pcap")):
+    for pcap in sorted(DATA_DIR.glob("*/*.pcap")):
         pcaps.append({
             "run_id": pcap.parent.name,
+            "filename": pcap.name,
             "size_bytes": pcap.stat().st_size,
             "url": f"/runs/{pcap.parent.name}/pcap",
         })
@@ -78,15 +79,17 @@ async def get_status():
 
 @router.get("/runs/{run_id}/pcap")
 async def get_pcap(run_id: str):
-    # 防路径穿越：run_id 必须是 RUNS_DIR 下的直接子目录
-    run_dir = (RUNS_DIR / run_id).resolve()
-    if not str(run_dir).startswith(str(RUNS_DIR.resolve())):
+    # 防路径穿越：run_id 必须是 DATA_DIR 下的直接子目录
+    # （data/<run_id>/，run_id 形如 YYYYMMDD-HHMMSS-XXXX）
+    run_dir = (DATA_DIR / run_id).resolve()
+    if not str(run_dir).startswith(str(DATA_DIR.resolve())):
         raise HTTPException(400, "invalid run_id")
-    pcap = run_dir / "capture.pcap"
-    if not pcap.exists() or not pcap.is_file():
+    pcaps = sorted(run_dir.glob("*.pcap"))
+    if not pcaps:
         raise HTTPException(404, "pcap not found")
+    pcap = pcaps[0]
     return FileResponse(
         pcap,
         media_type="application/vnd.tcpdump.pcap",
-        filename=f"{run_id}.pcap",
+        filename=pcap.name,
     )
