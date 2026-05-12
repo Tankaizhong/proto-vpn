@@ -120,6 +120,9 @@ document.addEventListener("alpine:init", () => {
       inbound.users = [{ password: "REPLACE" }];
     } else if (s.protocol === "hy2") {
       inbound.users = [{ password: "REPLACE" }];
+      if (s.fields.hy2_obfs_password) {
+        inbound.obfs = { type: "salamander", password: s.fields.hy2_obfs_password };
+      }
     } else if (s.protocol === "ss2022") {
       inbound.method = "2022-blake3-aes-256-gcm";
       inbound.password = "REPLACE-32-BYTE-BASE64";
@@ -197,7 +200,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com" } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com", hy2_obfs_password: "" } },
 
     init() {},
 
@@ -239,6 +242,7 @@ document.addEventListener("alpine:init", () => {
       this.state.fields.ws_path = "/ray";
       this.state.fields.grpc_service_name = "proto";
       this.state.fields.cdn_host = "cdn.example.com";
+      this.state.fields.hy2_obfs_password = "";
     },
 
     // ----- 派生 -----

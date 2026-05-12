@@ -111,7 +111,10 @@ def _trojan_outbound(inb: dict, secrets: dict) -> dict:
 
 
 def _hy2_outbound(inb: dict, secrets: dict) -> dict:
-    return {"password": secrets["password"]}
+    out: dict = {"password": secrets["password"]}
+    if inb.get("obfs"):
+        out["obfs"] = dict(inb["obfs"])
+    return out
 
 
 def _vless_outbound(inb: dict, secrets: dict) -> dict:
