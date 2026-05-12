@@ -161,7 +161,7 @@ document.addEventListener("alpine:init", () => {
       inbound.transport = {
         type: "ws",
         path: s.fields.ws_path || "/ray",
-        ...(s.addons.has("cdn") ? { headers: { Host: "cdn.example.com" } } : {}),
+        ...(s.addons.has("cdn") ? { headers: { Host: s.fields.cdn_host || "cdn.example.com" } } : {}),
       };
     } else if (s.transport === "grpc") {
       inbound.transport = { type: "grpc", service_name: s.fields.grpc_service_name || "proto" };
@@ -197,7 +197,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto" } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com" } },
 
     init() {},
 
@@ -238,6 +238,7 @@ document.addEventListener("alpine:init", () => {
       this.state.fields.reality_handshake_port = 443;
       this.state.fields.ws_path = "/ray";
       this.state.fields.grpc_service_name = "proto";
+      this.state.fields.cdn_host = "cdn.example.com";
     },
 
     // ----- 派生 -----
