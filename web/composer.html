@@ -49,8 +49,14 @@
     </template>
 
     <!-- 5. 字段 (Fields) — 在 TLS 1.3 / Reality / WS / gRPC 传输、CDN 开启或 Hysteria2 时显示 -->
-    <section class="opt-group" x-show="$store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality' || $store.composer.state.transport === 'ws' || $store.composer.state.transport === 'grpc' || $store.composer.state.addons.has('cdn') || $store.composer.state.protocol === 'hy2'">
+    <section class="opt-group" x-show="$store.composer.state.protocol !== null || $store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality' || $store.composer.state.transport === 'ws' || $store.composer.state.transport === 'grpc' || $store.composer.state.addons.has('cdn') || $store.composer.state.protocol === 'hy2'">
       <h3>5. 字段 (Fields) <small>可选</small></h3>
+      <div class="field-row" x-show="$store.composer.state.protocol !== null">
+        <label for="listen_port">监听端口 <small>（仅预览；运行时固定为 8443）</small></label>
+        <input id="listen_port" type="number" min="1" max="65535"
+               :placeholder="$store.composer.state.protocol === 'trojan' ? '8443' : '443'"
+               x-model.number="$store.composer.state.fields.listen_port">
+      </div>
       <div class="field-row" x-show="$store.composer.state.tls === 'tls'">
         <label for="tls_server_name">TLS server_name</label>
         <input id="tls_server_name" type="text" placeholder="vpn.example.com"

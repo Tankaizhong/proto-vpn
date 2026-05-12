@@ -108,7 +108,7 @@ document.addEventListener("alpine:init", () => {
       type: typeMap[s.protocol],
       tag: fp.replace(/[\s\[\],+]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
       listen: "::",
-      listen_port: s.protocol === "hy2" ? 443 : (s.protocol === "trojan" ? 8443 : 443),
+      listen_port: parseInt(s.fields.listen_port) || (s.protocol === "hy2" ? 443 : (s.protocol === "trojan" ? 8443 : 443)),
     };
 
     if (s.protocol === "vless") {
@@ -200,7 +200,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com", hy2_obfs_password: "" } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { listen_port: "", tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com", hy2_obfs_password: "" } },
 
     init() {},
 
@@ -243,6 +243,7 @@ document.addEventListener("alpine:init", () => {
       this.state.fields.grpc_service_name = "proto";
       this.state.fields.cdn_host = "cdn.example.com";
       this.state.fields.hy2_obfs_password = "";
+      this.state.fields.listen_port = "";
     },
 
     // ----- 派生 -----
