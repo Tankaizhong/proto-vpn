@@ -136,7 +136,7 @@ document.addEventListener("alpine:init", () => {
         server_name: s.fields.tls_server_name || "vpn.example.com",
         certificate_path: "/etc/ssl/fullchain.pem",
         key_path: "/etc/ssl/privkey.pem",
-        ...(s.addons.has("utls") ? { utls: { enabled: true, fingerprint: "chrome" } } : {}),
+        ...(s.addons.has("utls") ? { utls: { enabled: true, fingerprint: s.fields.utls_fingerprint || "chrome" } } : {}),
         ...(s.addons.has("ech") ? {
           ech: {
             enabled: true,
@@ -156,7 +156,7 @@ document.addEventListener("alpine:init", () => {
           private_key: "REPLACE-REALITY-PRIV",
           short_id: ["REPLACE-HEX"],
         },
-        ...(s.addons.has("utls") ? { utls: { enabled: true, fingerprint: "chrome" } } : {}),
+        ...(s.addons.has("utls") ? { utls: { enabled: true, fingerprint: s.fields.utls_fingerprint || "chrome" } } : {}),
       };
     }
 
@@ -200,7 +200,7 @@ document.addEventListener("alpine:init", () => {
   // ====================================================================
   Alpine.store("composer", {
     groups: GROUPS,
-    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { listen_port: "", tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com", hy2_obfs_password: "" } },
+    state: { protocol: null, transport: null, tls: null, addons: new Set(), fields: { listen_port: "", tls_server_name: "vpn.example.com", reality_handshake_server: "www.microsoft.com", reality_handshake_port: 443, ws_path: "/ray", grpc_service_name: "proto", cdn_host: "cdn.example.com", hy2_obfs_password: "", utls_fingerprint: "chrome" } },
 
     init() {},
 
@@ -244,6 +244,7 @@ document.addEventListener("alpine:init", () => {
       this.state.fields.cdn_host = "cdn.example.com";
       this.state.fields.hy2_obfs_password = "";
       this.state.fields.listen_port = "";
+      this.state.fields.utls_fingerprint = "chrome";
     },
 
     // ----- 派生 -----

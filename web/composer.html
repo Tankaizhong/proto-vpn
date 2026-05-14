@@ -48,8 +48,8 @@
       </section>
     </template>
 
-    <!-- 5. 字段 (Fields) — 在 TLS 1.3 / Reality / WS / gRPC 传输、CDN 开启或 Hysteria2 时显示 -->
-    <section class="opt-group" x-show="$store.composer.state.protocol !== null || $store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality' || $store.composer.state.transport === 'ws' || $store.composer.state.transport === 'grpc' || $store.composer.state.addons.has('cdn') || $store.composer.state.protocol === 'hy2'">
+    <!-- 5. 字段 (Fields) — 在 TLS 1.3 / Reality / WS / gRPC 传输、CDN 开启、uTLS 或 Hysteria2 时显示 -->
+    <section class="opt-group" x-show="$store.composer.state.protocol !== null || $store.composer.state.tls === 'tls' || $store.composer.state.tls === 'reality' || $store.composer.state.transport === 'ws' || $store.composer.state.transport === 'grpc' || $store.composer.state.addons.has('cdn') || $store.composer.state.addons.has('utls') || $store.composer.state.protocol === 'hy2'">
       <h3>5. 字段 (Fields) <small>可选</small></h3>
       <div class="field-row" x-show="$store.composer.state.protocol !== null">
         <label for="listen_port">监听端口 <small>（仅预览；运行时固定为 8443）</small></label>
@@ -91,6 +91,21 @@
         <label for="hy2_obfs_password">Hysteria2 obfs 密码 <small>（salamander，留空不启用）</small></label>
         <input id="hy2_obfs_password" type="text" placeholder=""
                x-model="$store.composer.state.fields.hy2_obfs_password">
+      </div>
+      <div class="field-row" x-show="$store.composer.state.addons.has('utls')">
+        <label for="utls_fingerprint">uTLS 指纹 <small>（ClientHello 模拟目标）</small></label>
+        <select id="utls_fingerprint" x-model="$store.composer.state.fields.utls_fingerprint">
+          <option value="chrome">chrome（默认）</option>
+          <option value="firefox">firefox</option>
+          <option value="safari">safari</option>
+          <option value="ios">ios</option>
+          <option value="android">android</option>
+          <option value="edge">edge</option>
+          <option value="360">360</option>
+          <option value="qq">qq</option>
+          <option value="random">random</option>
+          <option value="randomized">randomized</option>
+        </select>
       </div>
     </section>
   </article>
